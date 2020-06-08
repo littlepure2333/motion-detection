@@ -4,7 +4,7 @@ import numpy as np
 import cv2
 
 # init camera
-camera = cv2.VideoCapture(0) ### <<<=== SET THE CORRECT CAMERA NUMBER
+camera = cv2.VideoCapture("example.mp4") ### <<<=== SET THE CORRECT CAMERA NUMBER
 camera.set(3,1280)             # set frame width
 camera.set(4,720)              # set frame height
 time.sleep(0.5)
@@ -13,7 +13,11 @@ print(camera.get(3),camera.get(4))
 # master frame
 master = None
 
-while 1:
+# save video
+fourcc = cv2.VideoWriter_fourcc(*'MP4V')  # 保存视频的编码
+out = cv2.VideoWriter('output1.mp4',fourcc, 30.0, (640,720))
+
+while True:
 
     # grab a frame
     (grabbed,frame0) = camera.read()
@@ -26,7 +30,9 @@ while 1:
     frame1 = cv2.cvtColor(frame0,cv2.COLOR_BGR2GRAY)
 
     # blur frame
-    frame2 = cv2.GaussianBlur(frame1,(15,15),0)
+    kernel_gaussian = (5,5)
+    frame2 = cv2.GaussianBlur(frame1,kernel_gaussian,0)
+    frame2 = frame1.copy()
 
     # initialize master
     if master is None:
@@ -36,16 +42,16 @@ while 1:
     # delta frame
     frame3 = cv2.absdiff(master,frame2)
 
-    # threshold frame
-    frame4 = cv2.threshold(frame3,15,255,cv2.THRESH_BINARY)[1]
+    # threshold frame: binaryzation
+    frame4 = cv2.threshold(frame3,10,255,cv2.THRESH_BINARY)[1]
 
     # dilate the thresholded image to fill in holes
     kernel = np.ones((2,2),np.uint8)
-    frame5 = cv2.erode(frame4,kernel,iterations=4)
-    frame5 = cv2.dilate(frame5,kernel,iterations=8)
+    frame5 = cv2.erode(frame4,kernel,iterations=1)
+    frame5 = cv2.dilate(frame5,kernel,iterations=3)
 
     # find contours on thresholded image
-    nada,contours,nada = cv2.findContours(frame5.copy(),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
+    contours,hierarchy = cv2.findContours(frame5.copy(),cv2.RETR_EXTERNAL,cv2.CHAIN_APPROX_SIMPLE)
 
     # make coutour frame
     frame6 = frame0.copy()
@@ -113,15 +119,37 @@ while 1:
     master = frame2
 
     # display
-    cv2.imshow("Frame0: Raw",frame0)
-    cv2.imshow("Frame1: Gray",frame1)
-    cv2.imshow("Frame2: Blur",frame2)
-    cv2.imshow("Frame3: Delta",frame3)
-    cv2.imshow("Frame4: Threshold",frame4)
-    cv2.imshow("Frame5: Dialated",frame5)
-    cv2.imshow("Frame6: Contours",frame6)
-    cv2.imshow("Frame7: Target",frame7)
-    
+    width =640
+    length = 360
+    position_x = 400
+    position_y = 50
+
+    # cv2.namedWindow("Frame0: Raw",0)
+    # cv2.resizeWindow("Frame0: Raw", width, length)
+    # cv2.moveWindow("Frame0: Raw", position_x, position_y)
+    # cv2.namedWindow("Frame5: Dialated",0)
+    # cv2.resizeWindow("Frame5: Dialated", width, length)
+    # cv2.moveWindow("Frame5: Dialated",position_x, position_y + length)
+
+    # cv2.imshow("Frame0: Raw",frame0)
+    # cv2.imshow("Frame1: Gray",frame1)
+    # cv2.imshow("Frame2: Blur",frame2)
+    # cv2.imshow("Frame3: Delta",frame3)
+    # cv2.imshow("Frame4: Threshold",frame4)
+    # cv2.imshow("Frame5: Dialated",frame5)
+    # cv2.imshow("Frame6: Contours",frame6)
+    # cv2.imshow("Frame7: Target",frame7)
+
+    imgc = cv2.cvtColor(frame5,cv2.COLOR_GRAY2BGR)
+    both = np.concatenate((frame0,imgc), axis=0)   #1 : horz, 0 : Vert. 
+    cv2.namedWindow("motion detection",0)
+    # cv2.resizeWindow("motion detection", 640, 720)
+
+    x, y = both.shape[0:2]
+    both_resize = cv2.resize(both, (int(y / 3), int(x / 3)))
+    out.write(both_resize)
+    cv2.imshow('motion detection',both)
+
     # key delay and action
     key = cv2.waitKey(1) & 0xFF
     if key == ord('q'):
@@ -131,6 +159,9 @@ while 1:
 
 # release camera
 camera.release()
+
+# release VideoWriter
+out.release()
 
 # close all windows
 cv2.destroyAllWindows()
